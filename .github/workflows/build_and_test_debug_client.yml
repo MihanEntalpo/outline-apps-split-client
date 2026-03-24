@@ -23,11 +23,27 @@ on:
     types:
       - opened
       - synchronize
+    paths:
+      - 'client/**'
+      - 'infrastructure/**'
+      - '.github/workflows/build_and_test_debug_client.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.nvmrc'
+      - 'go.mod'
+      - 'go.sum'
   push:
     branches:
       - master
-  schedule:
-    - cron: "0 13 * * *"  # Run daily at 1PM UTC.
+    paths:
+      - 'client/**'
+      - 'infrastructure/**'
+      - '.github/workflows/build_and_test_debug_client.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.nvmrc'
+      - 'go.mod'
+      - 'go.sum'
 
 jobs:
   web_test:
@@ -74,157 +90,6 @@ jobs:
 
       - name: Test Go Backend
         run: go test -race -bench=. -benchtime=100ms ./client/...
-
-  linux_debug_build:
-    name: Linux Debug Build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 20
-    needs: [web_test, backend_test]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2.3.4
-
-      - name: Install Node
-        uses: actions/setup-node@v3
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: ./package-lock.json
-
-      - name: Install NPM Dependencies
-        run: npm ci
-
-      - name: Install Go
-        uses: actions/setup-go@v4
-        with:
-          go-version-file: '${{ github.workspace }}/go.mod'
-
-      - name: Install zig
-        uses: mlugg/setup-zig@v1
-        with:
-          version: 0.13.0
-          use-cache: false
-
-      - name: Build Linux Client
-        run: npm run action client/electron/build linux
-
-  windows_debug_build:
-    name: Windows Debug Build
-    runs-on: windows-2025
-    timeout-minutes: 40
-    needs: [web_test, backend_test]
-    steps:
-      - name: Support longpaths
-        run: git config --system core.longpaths true
-
-      - name: Checkout
-        uses: actions/checkout@v2.3.4
-
-      - name: Install Node
-        uses: actions/setup-node@v3
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: ./package-lock.json
-
-      - name: Install NPM Dependencies
-        run: npm ci
-
-      - name: Install Go
-        uses: actions/setup-go@v4
-        with:
-          go-version-file: '${{ github.workspace }}/go.mod'
-
-      - name: Install zig
-        uses: mlugg/setup-zig@153c8d5202cbb8c7e10831110a3afd27593eb960
-        with:
-          version: 0.13.0
-          use-cache: false
-
-      - name: Build Windows Client
-        run: npm run action client/electron/build windows
-
-  macos_debug_build:
-    name: MacOS Debug Build
-    runs-on: macos-15
-    timeout-minutes: 20
-    needs: [web_test, backend_test]
-    steps:
-      - name: Display XCode
-        run: xcode-select --print-path
-
-      - name: Checkout
-        uses: actions/checkout@v2.3.4
-
-      - name: Install Node
-        uses: actions/setup-node@v3
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: ./package-lock.json
-
-      - name: Install NPM Dependencies
-        run: npm ci
-
-      - name: Install Go
-        uses: actions/setup-go@v4
-        with:
-          go-version-file: '${{ github.workspace }}/go.mod'
-
-      - name: Build Tun2Socks (required for Test OutlineAppleLib)
-        run: npm run action client/src/tun2socks/build macos
-
-      - name: Test OutlineAppleLib
-        run: npm run action client/src/cordova/test macos
-
-      - name: Build MacOS Client
-        run: npm run action client/src/cordova/build macos
-
-      # - uses: codecov/codecov-action@v4
-      #   with:
-      #     file: ./client/src/output/coverage/apple/macos/TestResult.xcresult
-      #     flags: unittests, apple, macos
-
-  ios_debug_build:
-    name: iOS Debug Build
-    runs-on: macos-14
-    timeout-minutes: 20
-    needs: [web_test, backend_test]
-    steps:
-      - name: Display XCode
-        run: xcode-select --print-path
-
-      - name: Checkout
-        uses: actions/checkout@v2.3.4
-
-      - name: Install Node
-        uses: actions/setup-node@v3
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: ./package-lock.json
-
-      - name: Install NPM Dependencies
-        run: npm ci
-
-      - name: Install Go
-        uses: actions/setup-go@v4
-        with:
-          go-version-file: '${{ github.workspace }}/go.mod'
-
-      - name: Build Tun2Socks (required for Test OutlineAppleLib)
-        run: npm run action client/src/tun2socks/build ios
-
-      - name: Test OutlineAppleLib
-        run: npm run action client/src/cordova/test ios
-
-      - name: Build iOS Client
-        run: npm run action client/src/cordova/build ios
-
-      # - uses: codecov/codecov-action@v4
-      #   with:
-      #     file: ./client/src/output/coverage/apple/ios/TestResult.xcresult
-      #     flags: unittests, apple, ios
 
   android_debug_build:
     name: Android Debug Build

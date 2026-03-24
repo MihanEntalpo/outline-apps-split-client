@@ -30,12 +30,12 @@ body {
   /* tokens */
   --min-supported-device-width: 320px;
 
-  --outline-primary: hsl(170, 60%, 46%);
-  --outline-primary-dark: hsl(176, 97%, 26%);
-  --outline-primary-rgb: 47, 186, 156;
+  --outline-primary: hsl(210, 60%, 46%);
+  --outline-primary-dark: hsl(216, 97%, 26%);
+  --outline-primary-rgb: 47, 117, 188;
 
-  --outline-primary-medium: hsl(172, 60%, 72%);
-  --outline-primary-light: hsl(174, 58%, 91%);
+  --outline-primary-medium: hsl(212, 60%, 72%);
+  --outline-primary-light: hsl(214, 58%, 91%);
 
   /* RGB values for primary color */
   --outline-dark-primary: hsl(200, 19%, 18%);

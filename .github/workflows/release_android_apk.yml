@@ -1,0 +1,86 @@
+# Copyright 2026 The Outline Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Release Android APK
+
+concurrency:
+  group: ${{ github.ref }}-release-android-apk
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'client/**'
+
+jobs:
+  build_and_release:
+    name: Build and Release Android APK
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ./package-lock.json
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: '${{ github.workspace }}/go.mod'
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install NPM Dependencies
+        run: npm ci
+
+      - name: Build Android Client
+        run: npm run action client/src/cordova/build android -- --verbose
+
+      - name: Prepare APK Metadata
+        id: apk
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          tag_name="android-apk-${GITHUB_SHA}"
+          apk_name="Outline-Select-${short_sha}.apk"
+          cp client/platforms/android/app/build/outputs/apk/debug/app-debug.apk "${apk_name}"
+          echo "short_sha=${short_sha}" >> "${GITHUB_OUTPUT}"
+          echo "tag_name=${tag_name}" >> "${GITHUB_OUTPUT}"
+          echo "apk_name=${apk_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.apk.outputs.tag_name }}
+          name: Outline Select APK ${{ steps.apk.outputs.short_sha }}
+          body: |
+            Automatically built Android debug APK from `master`.
+
+            Commit: `${{ github.sha }}`
+          prerelease: true
+          make_latest: false
+          files: ${{ steps.apk.outputs.apk_name }}
+          fail_on_unmatched_files: true

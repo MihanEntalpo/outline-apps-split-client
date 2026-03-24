@@ -96,8 +96,8 @@ export class AppRoot extends mixinBehaviors(
             var(--app-toolbar-gutter) + var(--app-toolbar-button-gutter)
           );
           --contact-view-max-width: 400px;
-          --light-green: #2fbea5;
-          --medium-green: #009688;
+          --light-green: #2f75bc;
+          --medium-green: #023583;
           --dark-green: #263238;
           --light-gray: #ececec;
           --paper-dialog-button-color: var(--medium-green);

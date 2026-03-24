@@ -15,6 +15,7 @@ import '@material/web/all.js';
 
 import {LitElement, css, html} from 'lit';
 import {customElement, property, state} from 'lit/decorators.js';
+import {repeat} from 'lit/directives/repeat.js';
 
 import {InstalledApp} from '../../../app/outline_server_repository/vpn';
 
@@ -43,9 +44,9 @@ export class VpnAppsDialog extends LitElement {
 
     header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
       gap: var(--outline-gutter);
+      justify-content: space-between;
     }
 
     .headline {
@@ -260,7 +261,11 @@ export class VpnAppsDialog extends LitElement {
                     ? html`<div class="empty-state">
                         ${this.localize('vpn-apps-dialog-selected-empty')}
                       </div>`
-                    : this.selectedApps.map(app => this.renderAppRow(app))}
+                    : repeat(
+                        this.selectedApps,
+                        app => app.packageName,
+                        app => this.renderAppRow(app, 'selected')
+                      )}
               </div>
             </section>
 
@@ -286,7 +291,11 @@ export class VpnAppsDialog extends LitElement {
                     ? html`<div class="empty-state">
                         ${this.localize('vpn-apps-dialog-empty')}
                       </div>`
-                    : this.availableApps.map(app => this.renderAppRow(app))}
+                    : repeat(
+                        this.availableApps,
+                        app => app.packageName,
+                        app => this.renderAppRow(app, 'available')
+                      )}
               </div>
             </section>
           </div>
@@ -304,12 +313,13 @@ export class VpnAppsDialog extends LitElement {
     `;
   }
 
-  private renderAppRow(app: InstalledApp) {
+  private renderAppRow(app: InstalledApp, listName: 'selected' | 'available') {
     const isSelected = this.editedPackageNames.includes(app.packageName);
+    const checkboxId = `${listName}-${app.packageName}`;
     return html`
-      <label class="app-row" for=${app.packageName}>
+      <label class="app-row" for=${checkboxId}>
         <md-checkbox
-          id=${app.packageName}
+          id=${checkboxId}
           ?checked=${isSelected}
           @change=${() => this.togglePackage(app.packageName)}
         ></md-checkbox>
