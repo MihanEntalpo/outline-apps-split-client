@@ -357,6 +357,11 @@ export class ServerCard extends LitElement implements ServerListItemElement {
     }
 
     return html`<md-menu class="card-menu" menuCorner=${Corner.END_END} quick>
+      ${this.server.canConfigureVpnApps
+        ? html`<md-menu-item @click="${this.configureVpnApps}">
+            ${this.localize('server-configure-vpn-apps')}
+          </md-menu-item>`
+        : null}
       <md-menu-item @click="${this.beginRename}">
         ${this.localize('server-rename')}
       </md-menu-item>
@@ -458,6 +463,16 @@ export class ServerCard extends LitElement implements ServerListItemElement {
     // app to intercept.
     this.dispatchEvent(
       new CustomEvent(ServerListItemEvent.CONFIGURE_DNS, {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  configureVpnApps() {
+    this.dispatchEvent(
+      new CustomEvent(ServerListItemEvent.CONFIGURE_VPN_APPS, {
+        detail: {serverId: this.server.id},
         bubbles: true,
         composed: true,
       })

@@ -18,4 +18,6 @@ parcelable TunnelConfig {
   String id;
   String name;
   String transportConfig;
+  List<String> vpnAppPackageNames;
+  int mtu;
 }

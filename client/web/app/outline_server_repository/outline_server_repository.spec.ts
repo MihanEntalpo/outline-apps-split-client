@@ -24,6 +24,7 @@ import {
 } from '.';
 import * as config from './config';
 import {FakeVpnApi} from './vpn.fake';
+import {InstalledApp, StartRequestJson, TunnelStatus, VpnApi} from './vpn';
 import {InvalidServiceConfiguration} from '../../model/errors';
 import {
   EventQueue,
@@ -119,11 +120,13 @@ describe('OutlineServerRepository', () => {
       id: 'server-0',
       name: 'fake server 0',
       accessKey: serversStorageV0ConfigToAccessKey(CONFIG_0_V0),
+      vpnAppPackageNames: [],
     });
     expect(serversJson).toContain({
       id: 'server-1',
       name: 'fake server 1',
       accessKey: serversStorageV0ConfigToAccessKey(CONFIG_1_V0),
+      vpnAppPackageNames: [],
     });
   });
 
@@ -140,8 +143,10 @@ describe('OutlineServerRepository', () => {
     expect(servers.length).toEqual(2);
     expect(servers[0].accessKey).toEqual(accessKey0);
     expect(servers[0].name).toEqual(CONFIG_0_V0.name);
+    expect(servers[0].vpnAppPackageNames).toEqual([]);
     expect(servers[1].accessKey).toEqual(accessKey1);
     expect(servers[1].name).toEqual(CONFIG_1_V0.name);
+    expect(servers[1].vpnAppPackageNames).toEqual([]);
   });
 
   it('add emits ServerAdded event', async () => {
@@ -212,6 +217,75 @@ describe('OutlineServerRepository', () => {
     const serversStorage: ServersStorageV1 = JSON.parse(item);
     const serverNames = serversStorage.map(s => s.name);
     expect(serverNames).toContain(NEW_SERVER_NAME);
+  });
+
+  it('stores VPN app package names per server', async () => {
+    const storage = new InMemoryStorage();
+    const repo = await newTestRepo(new EventQueue(), storage);
+    await repo.add(serversStorageV0ConfigToAccessKey(CONFIG_0_V0));
+
+    const server = repo.getAll()[0];
+    repo.setVpnAppPackageNames(server.id, [
+      'com.example.b',
+      'com.example.a',
+      'com.example.a',
+    ]);
+
+    expect(server.getVpnAppPackageNames()).toEqual([
+      'com.example.a',
+      'com.example.b',
+    ]);
+
+    const item = storage.getItem(TEST_ONLY.SERVERS_STORAGE_KEY) ?? '';
+    const serversStorage: ServersStorageV1 = JSON.parse(item);
+    expect(serversStorage[0].vpnAppPackageNames).toEqual([
+      'com.example.a',
+      'com.example.b',
+    ]);
+  });
+
+  it('loads stored VPN app package names', async () => {
+    const storageV1: ServersStorageV1 = [
+      {
+        id: 'server-0',
+        name: 'fake server 0',
+        accessKey: serversStorageV0ConfigToAccessKey(CONFIG_0_V0),
+        vpnAppPackageNames: ['com.example.b', 'com.example.a'],
+      },
+    ];
+    const storage = new InMemoryStorage(
+      new Map([[TEST_ONLY.SERVERS_STORAGE_KEY, JSON.stringify(storageV1)]])
+    );
+    const repo = await newTestRepo(new EventQueue(), storage);
+
+    expect(repo.getById('server-0')?.getVpnAppPackageNames()).toEqual([
+      'com.example.a',
+      'com.example.b',
+    ]);
+  });
+
+  it('connect passes VPN app package names to the VPN API', async () => {
+    const vpnApi = new RecordingVpnApi();
+    const repo = await newOutlineServerRepository(
+      vpnApi,
+      new EventQueue(),
+      new InMemoryStorage(),
+      _ => 'Outline Server'
+    );
+    await repo.add(serversStorageV0ConfigToAccessKey(CONFIG_0_V0));
+
+    const server = repo.getAll()[0];
+    repo.setVpnAppPackageNames(server.id, [
+      'com.example.video',
+      'com.example.browser',
+    ]);
+
+    await server.connect();
+
+    expect(vpnApi.lastStartRequest?.vpnApps).toEqual([
+      'com.example.browser',
+      'com.example.video',
+    ]);
   });
 
   it('rename emits ServerRenamed event', async () => {
@@ -343,4 +417,28 @@ async function newTestRepo(
       return 'Outline Server';
     }
   );
+}
+
+class RecordingVpnApi implements VpnApi {
+  lastStartRequest?: StartRequestJson;
+
+  async start(request: StartRequestJson): Promise<void> {
+    this.lastStartRequest = request;
+  }
+
+  async stop(_id: string): Promise<void> {}
+
+  async isRunning(_id: string): Promise<boolean> {
+    return false;
+  }
+
+  onStatusChange(_listener: (id: string, status: TunnelStatus) => void): void {}
+
+  supportsPerAppVpn(): boolean {
+    return true;
+  }
+
+  async listInstalledApps(): Promise<InstalledApp[]> {
+    return [];
+  }
 }

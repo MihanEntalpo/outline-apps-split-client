@@ -161,6 +161,14 @@ const getSharedComponents = (element: ServerListItemElement & LitElement) => {
 
   const dispatchers = {
     beginRename: () => (element.isRenameDialogOpen = true),
+    configureVpnApps: () =>
+      element.dispatchEvent(
+        new CustomEvent(ServerListItemEvent.CONFIGURE_VPN_APPS, {
+          detail: {serverId: server.id},
+          bubbles: true,
+          composed: true,
+        })
+      ),
     submitRename: (event: CustomEvent) => {
       element.isRenameDialogOpen = false;
 
@@ -229,6 +237,11 @@ const getSharedComponents = (element: ServerListItemElement & LitElement) => {
           menuCorner=${Corner.END_END}
           quick
         >
+          ${server.canConfigureVpnApps
+            ? html`<md-menu-item @click="${dispatchers.configureVpnApps}">
+                ${localize('server-configure-vpn-apps')}
+              </md-menu-item>`
+            : null}
           <md-menu-item @click="${dispatchers.beginRename}">
             ${localize('server-rename')}
           </md-menu-item>

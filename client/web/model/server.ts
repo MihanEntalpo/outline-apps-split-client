@@ -40,11 +40,18 @@ export interface Server {
 
   // Checks whether the server is already active and in use.
   checkRunning(): Promise<boolean>;
+
+  // Returns the Android per-app VPN allowlist for this server.
+  getVpnAppPackageNames(): string[];
+
+  // Updates the Android per-app VPN allowlist for this server.
+  setVpnAppPackageNames(packageNames: string[]): void;
 }
 
 export interface ServerRepository {
   add(accessKey: string): Promise<void>;
   rename(serverId: string, name: string): void;
+  setVpnAppPackageNames(serverId: string, packageNames: string[]): void;
   forget(serverId: string): Promise<void>;
   undoForget(serverId: string): void;
   getAll(): Server[];

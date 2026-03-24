@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {StartRequestJson, VpnApi, TunnelStatus} from './vpn';
+import {InstalledApp, StartRequestJson, VpnApi, TunnelStatus} from './vpn';
 import * as errors from '../../model/errors';
 import {OUTLINE_PLUGIN_NAME, pluginExec} from '../plugin.cordova';
+import {normalizeAndroidVpnMtu, Settings, SettingsKey} from '../settings';
 
 export class CordovaVpnApi implements VpnApi {
   constructor() {}
@@ -23,12 +24,17 @@ export class CordovaVpnApi implements VpnApi {
     if (!request.client) {
       throw new errors.IllegalServerConfiguration();
     }
+    const mtu = normalizeAndroidVpnMtu(
+      new Settings().get(SettingsKey.ANDROID_VPN_MTU)
+    );
     return pluginExec<void>(
       'start',
       // TODO(fortuna): Make the Cordova plugin take a StartRequestJson.
       request.id,
       request.name,
-      request.client
+      request.client,
+      request.vpnApps,
+      mtu
     );
   }
 
@@ -49,5 +55,16 @@ export class CordovaVpnApi implements VpnApi {
     };
     console.debug('CordovaVpnApi: registering onStatusChange callback');
     cordova.exec(callback, onError, OUTLINE_PLUGIN_NAME, 'onStatusChange', []);
+  }
+
+  supportsPerAppVpn(): boolean {
+    return cordova.platformId === 'android';
+  }
+
+  listInstalledApps(): Promise<InstalledApp[]> {
+    if (!this.supportsPerAppVpn()) {
+      return Promise.resolve([]);
+    }
+    return pluginExec<InstalledApp[]>('listInstalledApps');
   }
 }

@@ -48,6 +48,21 @@ public class VpnTunnelStoreTest {
     }
 
     @Test
+    public void tunnelInfoWithVpnAppSelection() throws Exception {
+        info.put("vpnAppPackageNames", new org.json.JSONArray()
+            .put("com.example.browser")
+            .put("com.example.chat"));
+
+        store.save(info);
+
+        final JSONObject info2 = store.load();
+        assertNotNull(info2);
+        assertEquals(
+            "[\"com.example.browser\",\"com.example.chat\"]",
+            info2.getJSONArray("vpnAppPackageNames").toString());
+    }
+
+    @Test
     public void tunnelStatus() {
         store.setTunnelStatus(VpnTunnelService.TunnelStatus.RECONNECTING);
         assertEquals(VpnTunnelService.TunnelStatus.RECONNECTING, store.getTunnelStatus());

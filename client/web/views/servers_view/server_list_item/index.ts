@@ -26,6 +26,7 @@ export enum ServerConnectionType {
 
 export enum ServerListItemEvent {
   CONFIGURE_DNS = 'ConfigureDns',
+  CONFIGURE_VPN_APPS = 'ConfigureVpnApps',
   CONNECT = 'ConnectPressed',
   DISCONNECT = 'DisconnectPressed',
   FORGET = 'ForgetPressed',
@@ -43,6 +44,7 @@ export interface ServerListItem {
   name: string;
   connectionState: ServerConnectionState;
   connectionType?: ServerConnectionType;
+  canConfigureVpnApps?: boolean;
 }
 
 /**

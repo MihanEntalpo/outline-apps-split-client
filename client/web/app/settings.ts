@@ -22,6 +22,7 @@ export enum SettingsKey {
   AUTO_CONNECT_DIALOG_DISMISSED = 'auto-connect-dialog-dismissed',
   PRIVACY_ACK = 'privacy-ack',
   APPEARANCE = 'appearance',
+  ANDROID_VPN_MTU = 'android-vpn-mtu',
 }
 
 // Theme options
@@ -29,6 +30,25 @@ export enum Appearance {
   LIGHT = 'light',
   DARK = 'dark',
   SYSTEM = 'system',
+}
+
+export const DEFAULT_ANDROID_VPN_MTU = 1300;
+export const MIN_ANDROID_VPN_MTU = 1280;
+export const MAX_ANDROID_VPN_MTU = 1500;
+
+export function normalizeAndroidVpnMtu(
+  value: string | number | undefined | null
+): number {
+  const mtu =
+    typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
+  if (
+    Number.isInteger(mtu) &&
+    mtu >= MIN_ANDROID_VPN_MTU &&
+    mtu <= MAX_ANDROID_VPN_MTU
+  ) {
+    return mtu;
+  }
+  return DEFAULT_ANDROID_VPN_MTU;
 }
 
 // Persistent storage for user settings that supports a limited set of keys.

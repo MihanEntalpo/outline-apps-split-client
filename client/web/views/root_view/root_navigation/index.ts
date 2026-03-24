@@ -27,6 +27,7 @@ export class RootNavigation extends LitElement {
   @property({type: String}) align: 'left' | 'right';
   @property({type: String}) dataCollectionPageUrl: string;
   @property({type: Boolean}) showAppearanceView: boolean = false;
+  @property({type: Boolean}) showMtuView: boolean = false;
 
   static styles = css`
     :host {
@@ -246,6 +247,15 @@ export class RootNavigation extends LitElement {
                   <md-ripple></md-ripple>
                   <md-icon slot="start">brightness_medium</md-icon>
                   ${this.localize('appearance-page-title')}
+                </md-list-item>
+              `
+            : nothing}
+          ${this.showMtuView
+            ? html`
+                <md-list-item @click=${() => this.changePage('mtu')}>
+                  <md-ripple></md-ripple>
+                  <md-icon slot="start">swap_vert</md-icon>
+                  ${this.localize('mtu-page-title')}
                 </md-list-item>
               `
             : nothing}

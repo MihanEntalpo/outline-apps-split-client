@@ -14,7 +14,12 @@
 
 import {InMemoryStorage} from '@outline/infrastructure/memory_storage';
 
-import {Settings, SettingsKey} from './settings';
+import {
+  DEFAULT_ANDROID_VPN_MTU,
+  normalizeAndroidVpnMtu,
+  Settings,
+  SettingsKey,
+} from './settings';
 
 
 const FAKE_SETTINGS_KEYS = ['key', 'key1', 'key2'];
@@ -70,6 +75,17 @@ describe('Settings', () => {
     // Constructor uses SettingKeys as the default value for valid keys.
     const settings = new Settings(new InMemoryStorage());
     expect(settings.isValidSetting(SettingsKey.VPN_WARNING_DISMISSED)).toBeTruthy();
+    expect(settings.isValidSetting(SettingsKey.ANDROID_VPN_MTU)).toBeTruthy();
+  });
+
+  it('normalizes Android VPN MTU values', () => {
+    expect(normalizeAndroidVpnMtu('1300')).toEqual(1300);
+    expect(normalizeAndroidVpnMtu(1400)).toEqual(1400);
+    expect(normalizeAndroidVpnMtu(undefined)).toEqual(DEFAULT_ANDROID_VPN_MTU);
+    expect(normalizeAndroidVpnMtu('bad-value')).toEqual(
+      DEFAULT_ANDROID_VPN_MTU
+    );
+    expect(normalizeAndroidVpnMtu('900')).toEqual(DEFAULT_ANDROID_VPN_MTU);
   });
 
   it('throws when setting an invalid key', () => {

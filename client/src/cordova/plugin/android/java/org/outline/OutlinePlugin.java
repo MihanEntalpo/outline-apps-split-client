@@ -22,11 +22,17 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.net.VpnService;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.RemoteException;
 import androidx.annotation.Nullable;
+import java.text.Collator;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Level;
@@ -62,6 +68,7 @@ public class OutlinePlugin extends CordovaPlugin {
     STOP("stop"),
     ON_STATUS_CHANGE("onStatusChange"),
     IS_RUNNING("isRunning"),
+    LIST_INSTALLED_APPS("listInstalledApps"),
     INIT_ERROR_REPORTING("initializeErrorReporting"),
     REPORT_EVENTS("reportEvents"),
     QUIT("quitApplication");
@@ -215,7 +222,25 @@ public class OutlinePlugin extends CordovaPlugin {
           final String tunnelId = args.getString(0);
           final String serverName = args.getString(1);
           final String transportConfig = args.getString(2);
-          sendActionResult(callback, startVpnTunnel(tunnelId, transportConfig, serverName));
+          final List<String> vpnAppPackageNames = new ArrayList<>();
+          int mtu = 0;
+          if (args.length() > 3 && !args.isNull(3)) {
+            final JSONArray vpnApps = args.getJSONArray(3);
+            for (int i = 0; i < vpnApps.length(); ++i) {
+              vpnAppPackageNames.add(vpnApps.getString(i));
+            }
+          }
+          if (args.length() > 4 && !args.isNull(4)) {
+            mtu = args.getInt(4);
+          }
+          sendActionResult(
+              callback,
+              startVpnTunnel(
+                  tunnelId,
+                  transportConfig,
+                  serverName,
+                  vpnAppPackageNames,
+                  mtu));
         } else if (Action.STOP.is(action)) {
           final String tunnelId = args.getString(0);
           LOG.info(String.format(Locale.ROOT, "Stopping VPN tunnel %s", tunnelId));
@@ -224,6 +249,8 @@ public class OutlinePlugin extends CordovaPlugin {
           final String tunnelId = args.getString(0);
           boolean isActive = isTunnelActive(tunnelId);
           callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, isActive));
+        } else if (Action.LIST_INSTALLED_APPS.is(action)) {
+          callback.success(listInstalledApps());
 
           // Static actions
         } else if (Action.INIT_ERROR_REPORTING.is(action)) {
@@ -278,14 +305,63 @@ public class OutlinePlugin extends CordovaPlugin {
   }
 
   private DetailedJsonError startVpnTunnel(
-      final String tunnelId, final String transportConfig, final String serverName
+      final String tunnelId,
+      final String transportConfig,
+      final String serverName,
+      final List<String> vpnAppPackageNames,
+      final int mtu
   ) throws RemoteException {
     LOG.info(String.format(Locale.ROOT, "Starting VPN tunnel %s for server %s", tunnelId, serverName));
     final TunnelConfig tunnelConfig = new TunnelConfig();
     tunnelConfig.id = tunnelId;
     tunnelConfig.name = serverName;
     tunnelConfig.transportConfig = transportConfig;
+    tunnelConfig.vpnAppPackageNames = vpnAppPackageNames;
+    tunnelConfig.mtu = mtu;
     return vpnTunnelService.startTunnel(tunnelConfig);
+  }
+
+  private JSONArray listInstalledApps() throws JSONException {
+    final PackageManager packageManager = getBaseContext().getPackageManager();
+    final List<ApplicationInfo> installedApps;
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      installedApps = packageManager.getInstalledApplications(
+          PackageManager.ApplicationInfoFlags.of(0));
+    } else {
+      installedApps = packageManager.getInstalledApplications(0);
+    }
+
+    final String ownPackageName = getBaseContext().getPackageName();
+    final Collator collator = Collator.getInstance(Locale.getDefault());
+    collator.setStrength(Collator.PRIMARY);
+    final List<JSONObject> appEntries = new ArrayList<>();
+
+    for (ApplicationInfo appInfo : installedApps) {
+      if (ownPackageName.equals(appInfo.packageName)) {
+        continue;
+      }
+      final JSONObject appJson = new JSONObject();
+      appJson.put("name", String.valueOf(packageManager.getApplicationLabel(appInfo)));
+      appJson.put("packageName", appInfo.packageName);
+      appEntries.add(appJson);
+    }
+
+    appEntries.sort((left, right) -> {
+      final int byName = collator.compare(
+          left.optString("name", ""),
+          right.optString("name", ""));
+      if (byName != 0) {
+        return byName;
+      }
+      return left.optString("packageName", "").compareTo(
+          right.optString("packageName", ""));
+    });
+
+    final JSONArray apps = new JSONArray();
+    for (JSONObject appJson : appEntries) {
+      apps.put(appJson);
+    }
+    return apps;
   }
 
   // Returns whether the VPN service is running a particular tunnel instance.

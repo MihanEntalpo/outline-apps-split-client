@@ -37,7 +37,8 @@ export async function newOutlineServer(
   id: string,
   name: string | undefined,
   accessKey: string,
-  localize: Localizer
+  localize: Localizer,
+  vpnAppPackageNames: string[] = []
 ): Promise<Server> {
   const serviceConfig = await parseAccessKey(accessKey);
   name = name ?? serviceConfig.name;
@@ -53,7 +54,13 @@ export async function newOutlineServer(
               tunnelConfigLocation.port
             );
     }
-    const server = new OutlineServer(vpnApi, id, name, serviceConfig);
+    const server = new OutlineServer(
+      vpnApi,
+      id,
+      name,
+      serviceConfig,
+      vpnAppPackageNames
+    );
     return server;
   } else if (serviceConfig instanceof StaticServiceConfig) {
     if (!name) {
@@ -63,26 +70,36 @@ export async function newOutlineServer(
           : 'server-default-name'
       );
     }
-    return new OutlineServer(vpnApi, id, name, serviceConfig);
+    return new OutlineServer(
+      vpnApi,
+      id,
+      name,
+      serviceConfig,
+      vpnAppPackageNames
+    );
   }
 }
 
 class OutlineServer implements Server {
   errorMessageId?: string;
   private startRequest: StartRequestJson;
+  private vpnAppPackageNames: string[];
 
   constructor(
     private vpnApi: VpnApi,
     readonly id: string,
     public name: string,
-    private serviceConfig: ServiceConfig
+    private serviceConfig: ServiceConfig,
+    vpnAppPackageNames: string[]
   ) {
+    this.vpnAppPackageNames = normalizeVpnAppPackageNames(vpnAppPackageNames);
     if (serviceConfig instanceof StaticServiceConfig) {
       this.startRequest = {
         id,
         name,
         firstHop: serviceConfig.firstHop,
         client: serviceConfig.client,
+        vpnApps: this.vpnAppPackageNames,
       };
     }
   }
@@ -102,6 +119,7 @@ class OutlineServer implements Server {
         name: this.name,
         firstHop: tunnelConfig.firstHop,
         client: tunnelConfig.client,
+        vpnApps: this.vpnAppPackageNames,
       };
       connectionType = tunnelConfig.connectionType;
     } else {
@@ -153,6 +171,24 @@ class OutlineServer implements Server {
   checkRunning(): Promise<boolean> {
     return this.vpnApi.isRunning(this.id);
   }
+
+  getVpnAppPackageNames(): string[] {
+    return [...this.vpnAppPackageNames];
+  }
+
+  setVpnAppPackageNames(packageNames: string[]): void {
+    this.vpnAppPackageNames = normalizeVpnAppPackageNames(packageNames);
+    if (this.startRequest) {
+      this.startRequest.vpnApps = this.getVpnAppPackageNames();
+    }
+  }
+}
+
+function normalizeVpnAppPackageNames(packageNames: string[]): string[] {
+  const uniquePackageNames = new Set(
+    packageNames.map(packageName => packageName.trim()).filter(Boolean)
+  );
+  return Array.from(uniquePackageNames).sort((a, b) => a.localeCompare(b));
 }
 
 /** fetchTunnelConfig fetches information from a dynamic access key and attempts to parse it. */

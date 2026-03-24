@@ -38,10 +38,15 @@ import androidx.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.outline.IVpnTunnelService;
@@ -66,9 +71,14 @@ public class VpnTunnelService extends VpnService {
   private static final int NOTIFICATION_SERVICE_ID = 1;
   private static final int NOTIFICATION_COLOR = 0x00BFA5;
   private static final String NOTIFICATION_CHANNEL_ID = "outline-vpn";
+  private static final int DEFAULT_TUN_MTU = 1300;
+  private static final int MIN_TUN_MTU = 1280;
+  private static final int MAX_TUN_MTU = 1500;
   private static final String TUNNEL_ID_KEY = "id";
   private static final String TUNNEL_CONFIG_KEY = "config";
   private static final String TUNNEL_SERVER_NAME = "serverName";
+  private static final String TUNNEL_VPN_APP_PACKAGE_NAMES = "vpnAppPackageNames";
+  private static final String TUNNEL_MTU = "mtu";
 
   public static final String STATUS_BROADCAST_KEY = "onStatusChange";
 
@@ -198,20 +208,29 @@ public class VpnTunnelService extends VpnService {
     if (config.id == null || config.transportConfig == null) {
       return new PlatformError(Platerrors.InvalidConfig, "id and transportConfig are required");
     }
+    config.vpnAppPackageNames = normalizeVpnAppPackageNames(config.vpnAppPackageNames);
+    config.mtu = normalizeVpnMtu(config.mtu);
     // We check if the VPN is already running. This happens when a user connects to a server while
     // already connected to another one.
     // Instead of tearing down the VPN and starting from scratch, we just replace the remote device
     // and restart the traffic exchange.
     final boolean alreadyRunning = this.tunnelConfig != null && this.tunFd != null;
+    final boolean canReuseVpn = alreadyRunning
+        && haveSameVpnRoutingConfiguration(this.tunnelConfig, config);
     if (alreadyRunning) {
       // Broadcast the previous instance disconnect event before reassigning the tunnel config.
       broadcastVpnConnectivityChange(TunnelStatus.DISCONNECTED);
-      stopForeground();
-      try {
-        // Stops the remote device; does not tear down the VPN to avoid leaking traffic.
-        this.stopRemoteDevice();
-      } catch (Exception e) {
-        LOG.log(Level.SEVERE, "Failed to disconnect tunnel", e);
+      if (canReuseVpn) {
+        stopForeground();
+        try {
+          // Stops the remote device; does not tear down the VPN to avoid leaking traffic.
+          this.stopRemoteDevice();
+        } catch (Exception e) {
+          LOG.log(Level.SEVERE, "Failed to disconnect tunnel", e);
+        }
+      } else {
+        LOG.info("Per-app VPN selection changed; recreating the VPN interface.");
+        tearDownActiveTunnel();
       }
     } else {
       // Make sure we have a fully clean state.
@@ -232,7 +251,7 @@ public class VpnTunnelService extends VpnService {
 
     // If the VPN is already running, we skip the set up of the VPN routing.
     // TODO(fortuna): we should probably shutdown and restart, in case the config changed.
-    if (!alreadyRunning) {
+    if (!canReuseVpn) {
       // Only establish the VPN if this is not a tunnel restart.
       try {
         // A "fake" local DNS resolver. Outline will intercept the real resolver at this address.
@@ -241,15 +260,15 @@ public class VpnTunnelService extends VpnService {
         VpnService.Builder builder =
                 new VpnService.Builder()
                         .setSession(this.getApplicationName())
-                        // Standard MTU.
                         // TODO(fortuna): consider deriving it from the underlying MTU and selected transport.
-                        .setMtu(1500)
+                        .setMtu(config.mtu)
                         // Some random local IP we believe won't conflict.
                         // TODO(fortuna): dynamically select it.
                         .addAddress("10.111.222.1", 24)
                         .addDnsServer(dnsResolver)
-                        .setBlocking(true)
-                        .addDisallowedApplication(this.getPackageName());
+                        .setBlocking(true);
+
+        applyVpnAppSelection(builder, config.vpnAppPackageNames);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
           builder.setMetered(false);
@@ -466,6 +485,9 @@ public class VpnTunnelService extends VpnService {
       tunnelConfig.id = tunnel.getString(TUNNEL_ID_KEY);
       tunnelConfig.name = tunnel.getString(TUNNEL_SERVER_NAME);
       tunnelConfig.transportConfig = tunnel.getString(TUNNEL_CONFIG_KEY);
+      tunnelConfig.vpnAppPackageNames = jsonArrayToStringList(
+          tunnel.optJSONArray(TUNNEL_VPN_APP_PACKAGE_NAMES));
+      tunnelConfig.mtu = normalizeVpnMtu(tunnel.optInt(TUNNEL_MTU, DEFAULT_TUN_MTU));
 
       // Start the service in the foreground as per Android 8+ background service execution limits.
       // Requires android.permission.FOREGROUND_SERVICE since Android P.
@@ -481,12 +503,89 @@ public class VpnTunnelService extends VpnService {
     JSONObject tunnel = new JSONObject();
     try {
       tunnel.put(TUNNEL_ID_KEY, config.id).put(
-        TUNNEL_CONFIG_KEY, config.transportConfig).put(TUNNEL_SERVER_NAME, config.name);
+        TUNNEL_CONFIG_KEY, config.transportConfig).put(TUNNEL_SERVER_NAME, config.name).put(
+            TUNNEL_VPN_APP_PACKAGE_NAMES,
+            new JSONArray(normalizeVpnAppPackageNames(config.vpnAppPackageNames))).put(
+                TUNNEL_MTU, normalizeVpnMtu(config.mtu));
       tunnelStore.save(tunnel);
     } catch (JSONException e) {
       LOG.log(Level.SEVERE, "Failed to store JSON tunnel data", e);
     }
     tunnelStore.setTunnelStatus(TunnelStatus.CONNECTED);
+  }
+
+  private void applyVpnAppSelection(
+      @NonNull VpnService.Builder builder, @Nullable List<String> vpnAppPackageNames
+  ) throws PackageManager.NameNotFoundException {
+    final ArrayList<String> validPackages = new ArrayList<>();
+    for (String packageName : normalizeVpnAppPackageNames(vpnAppPackageNames)) {
+      if (this.getPackageName().equals(packageName)) {
+        continue;
+      }
+      try {
+        builder.addAllowedApplication(packageName);
+        validPackages.add(packageName);
+      } catch (PackageManager.NameNotFoundException e) {
+        LOG.log(Level.WARNING, "Skipping missing VPN application package", e);
+      }
+    }
+
+    if (validPackages.isEmpty()) {
+      builder.addDisallowedApplication(this.getPackageName());
+    }
+  }
+
+  private static boolean haveSameVpnRoutingConfiguration(
+      @Nullable TunnelConfig currentConfig, @NonNull TunnelConfig nextConfig
+  ) {
+    return normalizeVpnAppPackageNames(currentConfig == null
+            ? null
+            : currentConfig.vpnAppPackageNames)
+        .equals(normalizeVpnAppPackageNames(nextConfig.vpnAppPackageNames))
+        && normalizeVpnMtu(currentConfig == null ? 0 : currentConfig.mtu)
+            == normalizeVpnMtu(nextConfig.mtu);
+  }
+
+  private static int normalizeVpnMtu(int mtu) {
+    if (mtu >= MIN_TUN_MTU && mtu <= MAX_TUN_MTU) {
+      return mtu;
+    }
+    return DEFAULT_TUN_MTU;
+  }
+
+  private static ArrayList<String> normalizeVpnAppPackageNames(
+      @Nullable List<String> vpnAppPackageNames
+  ) {
+    if (vpnAppPackageNames == null || vpnAppPackageNames.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    final Set<String> uniquePackageNames = new HashSet<>();
+    for (String packageName : vpnAppPackageNames) {
+      if (packageName == null) {
+        continue;
+      }
+      final String trimmedPackageName = packageName.trim();
+      if (!trimmedPackageName.isEmpty()) {
+        uniquePackageNames.add(trimmedPackageName);
+      }
+    }
+
+    final ArrayList<String> normalizedPackageNames = new ArrayList<>(uniquePackageNames);
+    Collections.sort(normalizedPackageNames);
+    return normalizedPackageNames;
+  }
+
+  private static ArrayList<String> jsonArrayToStringList(@Nullable JSONArray jsonArray)
+      throws JSONException {
+    final ArrayList<String> values = new ArrayList<>();
+    if (jsonArray == null) {
+      return values;
+    }
+    for (int i = 0; i < jsonArray.length(); ++i) {
+      values.add(jsonArray.getString(i));
+    }
+    return normalizeVpnAppPackageNames(values);
   }
 
   // Error reporting

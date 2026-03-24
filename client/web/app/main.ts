@@ -27,6 +27,7 @@ import {
 } from './outline_server_repository/vpn.fake';
 import {OutlinePlatform} from './platform';
 import {Settings} from './settings';
+import {VpnApi} from './outline_server_repository/vpn';
 import {EventQueue} from '../model/events';
 import {ServerRepository} from '../model/server.js';
 
@@ -54,12 +55,12 @@ function getRootEl() {
 }
 
 async function createServerRepo(
-  platform: OutlinePlatform,
-  eventQueue: EventQueue
+  vpnApi: VpnApi,
+  eventQueue: EventQueue,
+  useFakeServers = false
 ): Promise<ServerRepository> {
   const localize = getLocalizationFunction();
-  const vpnApi = platform.getVpnApi();
-  if (vpnApi) {
+  if (!useFakeServers) {
     return await newOutlineServerRepository(
       vpnApi,
       eventQueue,
@@ -70,7 +71,7 @@ async function createServerRepo(
 
   console.debug('Platform not supported, using fake servers.');
   const repo = await newOutlineServerRepository(
-    new FakeVpnApi(),
+    vpnApi,
     eventQueue,
     window.localStorage,
     localize
@@ -120,7 +121,13 @@ export function main(platform: OutlinePlatform) {
       const debugMode = queryParams.get('debug') === 'true';
 
       const eventQueue = new EventQueue();
-      const serverRepo = await createServerRepo(platform, eventQueue);
+      const platformVpnApi = platform.getVpnApi();
+      const vpnApi = platformVpnApi ?? new FakeVpnApi();
+      const serverRepo = await createServerRepo(
+        vpnApi,
+        eventQueue,
+        !platformVpnApi
+      );
       const settings = new Settings();
       new App(
         eventQueue,
@@ -134,6 +141,7 @@ export function main(platform: OutlinePlatform) {
         environmentVars,
         platform.getUpdater(),
         platform.getVpnServiceInstaller(),
+        vpnApi,
         platform.quitApplication
       );
     },

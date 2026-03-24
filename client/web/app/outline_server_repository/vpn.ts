@@ -19,6 +19,11 @@ export const enum TunnelStatus {
   DISCONNECTING,
 }
 
+export interface InstalledApp {
+  name: string;
+  packageName: string;
+}
+
 /** StartRequestJson is the serializable request to start the VPN, used for persistence and IPCs. */
 export interface StartRequestJson {
   id: string;
@@ -27,6 +32,8 @@ export interface StartRequestJson {
   client: string;
   // First hop used by the legacy Electron code.
   firstHop: string;
+  // Android-only package allowlist. Empty means route all apps through the VPN.
+  vpnApps: string[];
 }
 
 /** VpnApi is how we talk to the platform-specific VPN API. */
@@ -47,4 +54,10 @@ export interface VpnApi {
 
   /** Sets a listener, to be called when the tunnel status changes. */
   onStatusChange(listener: (id: string, status: TunnelStatus) => void): void;
+
+  /** Returns whether the platform supports per-app VPN selection. */
+  supportsPerAppVpn(): boolean;
+
+  /** Lists installed applications available for per-app VPN selection. */
+  listInstalledApps(): Promise<InstalledApp[]>;
 }

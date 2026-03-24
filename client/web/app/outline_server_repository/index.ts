@@ -68,6 +68,7 @@ interface OutlineServerJson {
   readonly id: string;
   readonly accessKey: string;
   readonly name: string;
+  readonly vpnAppPackageNames?: string[];
 }
 
 type ServerEntry = {accessKey: string; server: Server};
@@ -165,6 +166,16 @@ class OutlineServerRepository implements ServerRepository {
     this.eventQueue.enqueue(new events.ServerRenamed(server));
   }
 
+  setVpnAppPackageNames(serverId: string, packageNames: string[]) {
+    const server = this.getById(serverId);
+    if (!server) {
+      console.warn(`Cannot update VPN apps for nonexistent server ${serverId}`);
+      return;
+    }
+    server.setVpnAppPackageNames(packageNames);
+    this.storeServers();
+  }
+
   async forget(serverId: string) {
     const entry = this.serverById.get(serverId);
     if (!entry) {
@@ -221,6 +232,7 @@ class OutlineServerRepository implements ServerRepository {
         id: server.id,
         accessKey,
         name: server.name,
+        vpnAppPackageNames: server.getVpnAppPackageNames(),
       });
     }
     const json = JSON.stringify(servers);
@@ -230,14 +242,16 @@ class OutlineServerRepository implements ServerRepository {
   async internalCreateServer(
     id: string,
     accessKey: string,
-    name?: string
+    name?: string,
+    vpnAppPackageNames: string[] = []
   ): Promise<Server> {
     const server = await newOutlineServer(
       this.vpnApi,
       id,
       name,
       accessKey,
-      this.localize
+      this.localize,
+      vpnAppPackageNames
     );
     this.serverById.set(id, {accessKey, server});
     return server;
@@ -299,7 +313,8 @@ async function loadServersV1(storage: Storage, repo: OutlineServerRepository) {
       await repo.internalCreateServer(
         serverJson.id,
         serverJson.accessKey,
-        serverJson.name
+        serverJson.name,
+        serverJson.vpnAppPackageNames ?? []
       );
     } catch (e) {
       // Don't propagate so other stored servers can be created.

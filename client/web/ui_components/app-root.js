@@ -59,11 +59,15 @@ import '../views/servers_view';
 // eslint-disable-next-line n/no-missing-import
 import '../views/root_view/add_access_key_dialog';
 // eslint-disable-next-line n/no-missing-import
+import '../views/root_view/vpn_apps_dialog';
+// eslint-disable-next-line n/no-missing-import
 import '../views/root_view/root_header';
 // eslint-disable-next-line n/no-missing-import
 import '../views/root_view/root_navigation';
 // eslint-disable-next-line n/no-missing-import
 import '../views/appearance_view';
+// eslint-disable-next-line n/no-missing-import
+import '../views/mtu_view';
 // eslint-disable-next-line n/no-missing-import
 import * as i18n from '@outline/infrastructure/i18n';
 import {AppLocalizeBehavior} from '@polymer/app-localize-behavior/app-localize-behavior.js';
@@ -364,6 +368,12 @@ export class AppRoot extends mixinBehaviors(
             selected-appearance="[[selectedAppearance]]"
             localize="[[localize]]"
           ></appearance-view>
+          <mtu-view
+            name="mtu"
+            id="mtuView"
+            vpn-mtu="[[vpnMtu]]"
+            localize="[[localize]]"
+          ></mtu-view>
         </iron-pages>
       </app-header-layout>
 
@@ -373,12 +383,18 @@ export class AppRoot extends mixinBehaviors(
         show-quit="[[shouldShowQuitButton]]"
         data-collection-page-url="https://s3.amazonaws.com/outline-vpn/static_downloads/Outline-Data-Collection-Policy.html"
         show-appearance-view="[[showAppearanceView]]"
+        show-mtu-view="[[showMtuView]]"
       ></root-navigation>
 
       <add-access-key-dialog
         id="addServerView"
         localize="[[localize]]"
       ></add-access-key-dialog>
+
+      <vpn-apps-dialog
+        id="vpnAppsDialog"
+        localize="[[localize]]"
+      ></vpn-apps-dialog>
 
       <error-details-dialog
         id="errorDetailsView"
@@ -595,8 +611,16 @@ export class AppRoot extends mixinBehaviors(
         type: Boolean,
         value: false,
       },
+      showMtuView: {
+        type: Boolean,
+        value: false,
+      },
       selectedAppearance: {
         type: String,
+      },
+      vpnMtu: {
+        type: Number,
+        value: 1300,
       },
       darkMode: {
         type: Boolean,

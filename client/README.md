@@ -1,6 +1,18 @@
 # <img alt="Outline Client Logo" src="../docs/resources/logo_client.png" title="Outline Client" width="32">&nbsp;&nbsp;Outline Client
 
-![Build and Test](https://github.com/OutlineFoundation/outline-apps/actions/workflows/build_and_test_debug_client.yml/badge.svg?branch=master) 
+## Fork Changes
+
+This fork modifies the Android client to ship as **Outline Select** and adds Android-specific app selection for VPN routing.
+
+Current fork-specific changes:
+
+- The Android app name is changed from `Outline` to `Outline Select`.
+- Android supports per-app VPN selection, allowing you to choose which installed apps are routed through the VPN.
+- The app selection UI includes search by application name and package name.
+- The app selection screen separates selected apps from the full installed-app list for easier management.
+- Android includes a configurable VPN MTU setting, with a default value of `1300`.
+
+## Original Client Information
 
 The Outline Client is a cross-platform VPN or proxy client for Windows, macOS, iOS, Android, and Debian-based Linux. The Outline Client is designed for use with the [Outline Server](https://github.com/OutlineFoundation/outline-server) software, but it is fully compatible with any [Shadowsocks](https://shadowsocks.org/) server.
 

@@ -362,6 +362,30 @@
     "description": "The menu item text to navigate to the page showing all the software licenses used in building the app.",
     "message": "Licenses"
   },
+  "mtu_description": {
+    "description": "Description text for the Android VPN MTU settings page.",
+    "message": "Set the Android VPN MTU used when Outline creates the VPN interface. Lower values can help on mobile networks with broken path MTU discovery."
+  },
+  "mtu_helper_text": {
+    "description": "Helper text on the Android VPN MTU settings page explaining the accepted range and default value.",
+    "message": "Enter a value between 1280 and 1500. Default: 1300."
+  },
+  "mtu_input_label": {
+    "description": "Label for the Android VPN MTU input field.",
+    "message": "VPN MTU"
+  },
+  "mtu_invalid": {
+    "description": "Validation error for an invalid Android VPN MTU value.",
+    "message": "Enter a whole number between 1280 and 1500."
+  },
+  "mtu_page_title": {
+    "description": "Menu item text and page title for the Android VPN MTU settings page.",
+    "message": "VPN MTU"
+  },
+  "mtu_saved": {
+    "description": "Toast shown after saving the Android VPN MTU setting.",
+    "message": "VPN MTU saved. It will apply the next time you connect."
+  },
   "next": {
     "description": "The text on a button to proceed to the next step.",
     "message": "Next"
@@ -631,6 +655,10 @@
       }
     }
   },
+  "server_configure_vpn_apps": {
+    "description": "The text of an option displayed in a server card's options menu to choose which Android apps should use the VPN for that server.",
+    "message": "Apps through VPN"
+  },
   "server_forget": {
     "description": "The text of an option displayed in a server card's options menu to tell the application to no longer display the server.",
     "message": "Forget"
@@ -754,6 +782,80 @@
   "update_downloaded": {
     "description": "A message shown to the user to notify them about a new downloaded version. Outline is the product name and can be found in the translation glossary.",
     "message": "An updated version of Outline has been downloaded. It will be installed when you restart Outline."
+  },
+  "vpn_apps_dialog_apply_next_connect": {
+    "description": "Toast shown after saving a per-app VPN selection for a server that is already connected.",
+    "message": "VPN app selection will apply next time you connect to $SERVER_NAME$.",
+    "placeholders": {
+      "SERVER_NAME": {
+        "content": "{serverName}",
+        "example": "My Outline Server"
+      }
+    }
+  },
+  "vpn_apps_dialog_available_count": {
+    "description": "Counter label in the Android per-app VPN selection dialog showing how many apps are currently available in the searchable list.",
+    "message": "$COUNT$ available",
+    "placeholders": {
+      "COUNT": {
+        "content": "{count}",
+        "example": "42"
+      }
+    }
+  },
+  "vpn_apps_dialog_available_title": {
+    "description": "Header above the list of available apps in the Android per-app VPN selection dialog.",
+    "message": "Available apps"
+  },
+  "vpn_apps_dialog_empty": {
+    "description": "Empty state shown in the Android per-app VPN selection dialog when no apps match the current search.",
+    "message": "No apps found."
+  },
+  "vpn_apps_dialog_help_label": {
+    "description": "Accessibility label for the help button in the Android per-app VPN selection dialog.",
+    "message": "Show help"
+  },
+  "vpn_apps_dialog_help_text": {
+    "description": "Help text in the Android per-app VPN selection dialog explaining how the allowlist works.",
+    "message": "If you do not select any apps, the VPN applies to all apps. If you select apps, the VPN applies only to the selected apps."
+  },
+  "vpn_apps_dialog_loading": {
+    "description": "Loading state shown while the Android per-app VPN selection dialog fetches installed apps.",
+    "message": "Loading installed apps..."
+  },
+  "vpn_apps_dialog_saved": {
+    "description": "Toast shown after saving a per-app VPN selection for a server that is not currently connected.",
+    "message": "VPN app selection saved."
+  },
+  "vpn_apps_dialog_search_label": {
+    "description": "Label for the search input in the Android per-app VPN selection dialog.",
+    "message": "Search by app or package"
+  },
+  "vpn_apps_dialog_selected_empty": {
+    "description": "Empty state shown when no applications are selected in the Android per-app VPN selection dialog.",
+    "message": "No apps selected."
+  },
+  "vpn_apps_dialog_selected_helper": {
+    "description": "Helper text under the selected apps section in the Android per-app VPN selection dialog.",
+    "message": "Turn apps off quickly here."
+  },
+  "vpn_apps_dialog_selected_count": {
+    "description": "Counter label in the Android per-app VPN selection dialog showing how many apps are selected.",
+    "message": "$COUNT$ selected",
+    "placeholders": {
+      "COUNT": {
+        "content": "{count}",
+        "example": "3"
+      }
+    }
+  },
+  "vpn_apps_dialog_selected_title": {
+    "description": "Header above the list of selected apps in the Android per-app VPN selection dialog.",
+    "message": "Selected apps"
+  },
+  "vpn_apps_dialog_title": {
+    "description": "Title of the Android per-app VPN selection dialog.",
+    "message": "Choose apps"
   },
   "version": {
     "description": "A line of text on the About page of the application showing the version of the application the user is using.",

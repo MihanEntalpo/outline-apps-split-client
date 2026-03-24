@@ -14,9 +14,7 @@
 
 import {IpcRendererEvent} from 'electron/main';
 
-import {TunnelStatus} from './vpn';
-import {StartRequestJson} from './vpn';
-import {VpnApi} from './vpn';
+import {InstalledApp, StartRequestJson, TunnelStatus, VpnApi} from './vpn';
 import * as methodChannel from '../method_channel';
 
 export class ElectronVpnApi implements VpnApi {
@@ -75,5 +73,13 @@ export class ElectronVpnApi implements VpnApi {
 
   onStatusChange(listener: (id: string, status: TunnelStatus) => void): void {
     this.statusChangeListener = listener;
+  }
+
+  supportsPerAppVpn(): boolean {
+    return false;
+  }
+
+  async listInstalledApps(): Promise<InstalledApp[]> {
+    return [];
   }
 }

@@ -18,7 +18,13 @@ import {OperationTimedOut} from '@outline/infrastructure/timeout_promise';
 import {Clipboard} from './clipboard';
 import {EnvironmentVariables} from './environment';
 import * as config from './outline_server_repository/config';
-import {Settings, SettingsKey, Appearance} from './settings';
+import {InstalledApp, VpnApi} from './outline_server_repository/vpn';
+import {
+  Settings,
+  SettingsKey,
+  Appearance,
+  normalizeAndroidVpnMtu,
+} from './settings';
 import {Updater} from './updater';
 import {UrlInterceptor} from './url_interceptor';
 import {VpnInstaller} from './vpn_installer';
@@ -84,7 +90,9 @@ const DEFAULT_SERVER_CONNECTION_STATUS_CHANGE_TIMEOUT = 600;
 export class App {
   private localize: Localizer;
   private ignoredAccessKeys: {[accessKey: string]: boolean} = {};
+  private installedApps: InstalledApp[] | null = null;
   private serverConnectionChangeTimeouts: {[serverId: string]: boolean} = {};
+  private vpnAppsDialogServerId: string | null = null;
 
   // Feature flag to control whether dark mode is enabled
   // When set to true, the theme option will appear in the navigation menu
@@ -104,6 +112,7 @@ export class App {
     environmentVars: EnvironmentVariables,
     private updater: Updater,
     private installer: VpnInstaller,
+    private vpnApi: VpnApi | undefined,
     private quitApplication: () => void,
     document = window.document
   ) {
@@ -113,6 +122,10 @@ export class App {
     rootEl.appVersion = environmentVars.APP_VERSION;
     rootEl.appBuild = environmentVars.APP_BUILD_NUMBER;
     rootEl.errorReporter = this.errorReporter;
+    rootEl.showMtuView = this.vpnApi?.supportsPerAppVpn() ?? false;
+    rootEl.vpnMtu = normalizeAndroidVpnMtu(
+      this.settings.get(SettingsKey.ANDROID_VPN_MTU)
+    );
 
     if (urlInterceptor) {
       this.registerUrlInterceptionListener(urlInterceptor);
@@ -174,6 +187,10 @@ export class App {
       this.renameServer.bind(this)
     );
     this.rootEl.addEventListener(
+      'ConfigureVpnApps',
+      this.configureVpnApps.bind(this)
+    );
+    this.rootEl.addEventListener(
       'QuitPressed',
       this.quitApplication.bind(this)
     );
@@ -188,6 +205,18 @@ export class App {
     this.rootEl.addEventListener(
       'SetLanguageRequested',
       this.setAppLanguage.bind(this)
+    );
+    this.rootEl.addEventListener(
+      'SetVpnMtuRequested',
+      this.setVpnMtu.bind(this)
+    );
+    this.rootEl.$.vpnAppsDialog.addEventListener(
+      'cancel',
+      this.cancelVpnAppsDialog.bind(this)
+    );
+    this.rootEl.$.vpnAppsDialog.addEventListener(
+      'confirm',
+      this.saveVpnAppsSelection.bind(this)
     );
 
     if (this.appearanceFeatureEnabled) {
@@ -410,6 +439,13 @@ export class App {
     this.changeToDefaultPage();
   }
 
+  private setVpnMtu(event: CustomEvent) {
+    const mtu = normalizeAndroidVpnMtu(event.detail.mtu);
+    this.settings.set(SettingsKey.ANDROID_VPN_MTU, String(mtu));
+    this.rootEl.vpnMtu = mtu;
+    this.rootEl.showToast(this.localize('mtu-saved'));
+  }
+
   private showAddServerDialog() {
     this.rootEl.$.addServerView.open = true;
   }
@@ -526,6 +562,66 @@ export class App {
   private renameServer(event: CustomEvent) {
     const {serverId, newName} = event.detail;
     this.serverRepo.rename(serverId, newName);
+  }
+
+  private async configureVpnApps(event: CustomEvent) {
+    event.stopImmediatePropagation();
+
+    if (!this.vpnApi?.supportsPerAppVpn()) {
+      return;
+    }
+
+    const {serverId} = event.detail;
+    const server = this.getServerByServerId(serverId);
+    const dialog = this.rootEl.$.vpnAppsDialog;
+
+    this.vpnAppsDialogServerId = serverId;
+    dialog.serverName = server.name;
+    dialog.selectedPackageNames = server.getVpnAppPackageNames();
+    dialog.loading = true;
+    dialog.apps = [];
+    dialog.open = true;
+
+    try {
+      this.installedApps ??= await this.vpnApi.listInstalledApps();
+      dialog.apps = this.installedApps;
+    } catch (e) {
+      console.error('Failed to load installed Android apps', e);
+      dialog.open = false;
+      this.showLocalizedError();
+    } finally {
+      dialog.loading = false;
+    }
+  }
+
+  private cancelVpnAppsDialog() {
+    this.rootEl.$.vpnAppsDialog.open = false;
+    this.vpnAppsDialogServerId = null;
+  }
+
+  private async saveVpnAppsSelection(event: CustomEvent) {
+    const serverId = this.vpnAppsDialogServerId;
+    this.rootEl.$.vpnAppsDialog.open = false;
+    this.vpnAppsDialogServerId = null;
+    if (!serverId) {
+      return;
+    }
+
+    const server = this.getServerByServerId(serverId);
+    this.serverRepo.setVpnAppPackageNames(serverId, event.detail.packageNames);
+
+    if (await server.checkRunning()) {
+      this.rootEl.showToast(
+        this.localize(
+          'vpn-apps-dialog-apply-next-connect',
+          'serverName',
+          server.name
+        )
+      );
+      return;
+    }
+
+    this.rootEl.showToast(this.localize('vpn-apps-dialog-saved'));
   }
 
   private async connectServer(event: CustomEvent) {
@@ -785,6 +881,7 @@ export class App {
       address: server.address,
       id: server.id,
       connectionState: ServerConnectionState.DISCONNECTED,
+      canConfigureVpnApps: this.vpnApi?.supportsPerAppVpn() ?? false,
     };
   }
 
